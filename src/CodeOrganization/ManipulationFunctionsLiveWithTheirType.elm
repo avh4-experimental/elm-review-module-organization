@@ -8,6 +8,7 @@ module CodeOrganization.ManipulationFunctionsLiveWithTheirType exposing (rule)
 
 import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Node as Node exposing (Node)
+import Elm.Syntax.TypeAnnotation as TypeAnnotation
 import Review.Rule as Rule exposing (Rule)
 
 
@@ -91,17 +92,22 @@ checkUpdateLikeFunctions node context =
                 Nothing ->
                     ( [], context )
 
-                Just typeAnnotation ->
-                    ( [ Rule.error
-                            { message = "Update.update and Model.Model should be defined in the same module"
-                            , details =
-                                [ "Update.update takes Model.Model as an input and returns it."
-                                ]
-                            }
-                            (Node.range typeAnnotation)
-                      ]
-                    , context
-                    )
+                Just signature ->
+                    case Node.value (Node.value signature).typeAnnotation of
+                        TypeAnnotation.FunctionTypeAnnotation arg return ->
+                            ( [ Rule.error
+                                    { message = "Update.update and Model.Model should be defined in the same module"
+                                    , details =
+                                        [ "Update.update takes Model.Model as an input and returns it."
+                                        ]
+                                    }
+                                    (Node.range signature)
+                              ]
+                            , context
+                            )
+
+                        _ ->
+                            ( [], context )
 
         _ ->
             ( [], context )

@@ -7,9 +7,10 @@ module CodeOrganization.ManipulationFunctionsLiveWithTheirType exposing (rule)
 -}
 
 import Elm.Syntax.Declaration as Declaration exposing (Declaration)
+import Elm.Syntax.Expression exposing (Function)
 import Elm.Syntax.Node as Node exposing (Node)
 import Elm.Syntax.Signature exposing (Signature)
-import Elm.Syntax.TypeAnnotation as TypeAnnotation
+import Elm.Syntax.TypeAnnotation as TypeAnnotation exposing (TypeAnnotation)
 import Review.Rule as Rule exposing (Rule)
 
 
@@ -88,8 +89,8 @@ checkUpdateLikeFunctions :
     -> ( List (Rule.Error {}), moduleContext )
 checkUpdateLikeFunctions node context =
     let
-        checkError : Node Signature -> Maybe (Rule.Error {})
-        checkError signature =
+        runRule : ( Node Signature, x ) -> Maybe (Rule.Error {})
+        runRule ( signature, _ ) =
             if True then
                 Just <|
                     Rule.error
@@ -110,20 +111,50 @@ checkUpdateLikeFunctions node context =
             , context
             )
     in
-    done <|
-        case Node.value node of
-            Declaration.FunctionDeclaration function ->
-                case function.signature of
-                    Nothing ->
-                        Nothing
+    getFunctionDeclaration node
+        |> Maybe.andThen getTypeAnnotation
+        |> Maybe.andThen collectInputAndOutputTypes
+        |> Maybe.andThen runRule
+        |> done
 
-                    Just signature ->
-                        case Node.value (Node.value signature).typeAnnotation of
-                            TypeAnnotation.FunctionTypeAnnotation arg return ->
-                                checkError signature
 
-                            _ ->
-                                Nothing
+getFunctionDeclaration : Node Declaration -> Maybe Function
+getFunctionDeclaration node =
+    case Node.value node of
+        Declaration.FunctionDeclaration function ->
+            Just function
 
-            _ ->
-                Nothing
+        _ ->
+            Nothing
+
+
+getTypeAnnotation : Function -> Maybe ( Node Signature, TypeAnnotation )
+getTypeAnnotation function =
+    case function.signature of
+        Nothing ->
+            Nothing
+
+        Just signature ->
+            Just
+                ( signature
+                , Node.value (Node.value signature).typeAnnotation
+                )
+
+
+collectInputAndOutputTypes :
+    ( signature, TypeAnnotation )
+    ->
+        Maybe
+            ( signature
+            , ()
+            )
+collectInputAndOutputTypes ( signature, typeAnnotation ) =
+    case typeAnnotation of
+        TypeAnnotation.FunctionTypeAnnotation arg return ->
+            Just
+                ( signature
+                , ()
+                )
+
+        _ ->
+            Nothing

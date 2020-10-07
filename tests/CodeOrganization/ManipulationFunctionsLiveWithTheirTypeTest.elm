@@ -38,4 +38,13 @@ all =
                             ]
                           )
                         ]
+        , test "does not report declarations that are not functions" <|
+            \() ->
+                String.join "\n"
+                    [ "module M exposing (..)"
+                    , "v : ()"
+                    , "v = ()"
+                    ]
+                    |> Review.Test.run rule
+                    |> Review.Test.expectNoErrors
         ]

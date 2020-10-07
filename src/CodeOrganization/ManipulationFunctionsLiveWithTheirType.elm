@@ -7,7 +7,10 @@ module CodeOrganization.ManipulationFunctionsLiveWithTheirType exposing (rule)
 -}
 
 import Elm.Syntax.Declaration as Declaration exposing (Declaration)
+import Elm.Syntax.Expression exposing (Function)
 import Elm.Syntax.Node as Node exposing (Node)
+import Elm.Syntax.Signature exposing (Signature)
+import Elm.Syntax.TypeAnnotation as TypeAnnotation exposing (TypeAnnotation)
 import Review.Rule as Rule exposing (Rule)
 
 
@@ -85,23 +88,75 @@ checkUpdateLikeFunctions :
     -> moduleContext
     -> ( List (Rule.Error {}), moduleContext )
 checkUpdateLikeFunctions node context =
+    let
+        runRule : ( Node Signature, x ) -> Maybe (Rule.Error {})
+        runRule ( signature, _ ) =
+            if True then
+                Just <|
+                    Rule.error
+                        { message = "Update.update and Model.Model should be defined in the same module"
+                        , details =
+                            [ "Update.update takes Model.Model as an input and returns it."
+                            ]
+                        }
+                        (Node.range signature)
+
+            else
+                Nothing
+
+        done errors =
+            ( errors
+                |> Maybe.map List.singleton
+                |> Maybe.withDefault []
+            , context
+            )
+    in
+    getFunctionDeclaration node
+        |> Maybe.andThen getTypeAnnotation
+        |> Maybe.andThen (mapSecondMaybe collectInputAndOutputTypes)
+        |> Maybe.andThen runRule
+        |> done
+
+
+getFunctionDeclaration : Node Declaration -> Maybe Function
+getFunctionDeclaration node =
     case Node.value node of
         Declaration.FunctionDeclaration function ->
-            case function.signature of
-                Nothing ->
-                    ( [], context )
-
-                Just typeAnnotation ->
-                    ( [ Rule.error
-                            { message = "Update.update and Model.Model should be defined in the same module"
-                            , details =
-                                [ "Update.update takes Model.Model as an input and returns it."
-                                ]
-                            }
-                            (Node.range typeAnnotation)
-                      ]
-                    , context
-                    )
+            Just function
 
         _ ->
-            ( [], context )
+            Nothing
+
+
+getTypeAnnotation : Function -> Maybe ( Node Signature, TypeAnnotation )
+getTypeAnnotation function =
+    case function.signature of
+        Nothing ->
+            Nothing
+
+        Just signature ->
+            Just
+                ( signature
+                , Node.value (Node.value signature).typeAnnotation
+                )
+
+
+collectInputAndOutputTypes : TypeAnnotation -> Maybe ()
+collectInputAndOutputTypes typeAnnotation =
+    case typeAnnotation of
+        TypeAnnotation.FunctionTypeAnnotation arg return ->
+            Just
+                ()
+
+        _ ->
+            Nothing
+
+
+
+-- Generic Maybe functions
+
+
+mapSecondMaybe : (a -> Maybe b) -> (( x, a ) -> Maybe ( x, b ))
+mapSecondMaybe f ( x, a ) =
+    f a
+        |> Maybe.map (\b -> ( x, b ))

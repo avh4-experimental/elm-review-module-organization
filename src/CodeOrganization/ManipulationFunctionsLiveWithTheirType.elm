@@ -88,38 +88,42 @@ checkUpdateLikeFunctions :
     -> ( List (Rule.Error {}), moduleContext )
 checkUpdateLikeFunctions node context =
     let
-        doCheck : Node Signature -> List (Rule.Error {})
-        doCheck signature =
+        checkError : Node Signature -> Maybe (Rule.Error {})
+        checkError signature =
             if True then
-                [ Rule.error
-                    { message = "Update.update and Model.Model should be defined in the same module"
-                    , details =
-                        [ "Update.update takes Model.Model as an input and returns it."
-                        ]
-                    }
-                    (Node.range signature)
-                ]
+                Just <|
+                    Rule.error
+                        { message = "Update.update and Model.Model should be defined in the same module"
+                        , details =
+                            [ "Update.update takes Model.Model as an input and returns it."
+                            ]
+                        }
+                        (Node.range signature)
 
             else
-                []
+                Nothing
 
         done errors =
-            ( errors, context )
+            ( errors
+                |> Maybe.map List.singleton
+                |> Maybe.withDefault []
+            , context
+            )
     in
     done <|
         case Node.value node of
             Declaration.FunctionDeclaration function ->
                 case function.signature of
                     Nothing ->
-                        []
+                        Nothing
 
                     Just signature ->
                         case Node.value (Node.value signature).typeAnnotation of
                             TypeAnnotation.FunctionTypeAnnotation arg return ->
-                                doCheck signature
+                                checkError signature
 
                             _ ->
-                                []
+                                Nothing
 
             _ ->
-                []
+                Nothing

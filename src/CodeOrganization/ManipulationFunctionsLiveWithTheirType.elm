@@ -113,7 +113,7 @@ checkUpdateLikeFunctions node context =
     in
     getFunctionDeclaration node
         |> Maybe.andThen getTypeAnnotation
-        |> Maybe.andThen collectInputAndOutputTypes
+        |> Maybe.andThen (mapSecondMaybe collectInputAndOutputTypes)
         |> Maybe.andThen runRule
         |> done
 
@@ -141,20 +141,22 @@ getTypeAnnotation function =
                 )
 
 
-collectInputAndOutputTypes :
-    ( signature, TypeAnnotation )
-    ->
-        Maybe
-            ( signature
-            , ()
-            )
-collectInputAndOutputTypes ( signature, typeAnnotation ) =
+collectInputAndOutputTypes : TypeAnnotation -> Maybe ()
+collectInputAndOutputTypes typeAnnotation =
     case typeAnnotation of
         TypeAnnotation.FunctionTypeAnnotation arg return ->
             Just
-                ( signature
-                , ()
-                )
+                ()
 
         _ ->
             Nothing
+
+
+
+-- Generic Maybe functions
+
+
+mapSecondMaybe : (a -> Maybe b) -> (( x, a ) -> Maybe ( x, b ))
+mapSecondMaybe f ( x, a ) =
+    f a
+        |> Maybe.map (\b -> ( x, b ))

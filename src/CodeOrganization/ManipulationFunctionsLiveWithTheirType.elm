@@ -88,36 +88,38 @@ checkUpdateLikeFunctions :
     -> ( List (Rule.Error {}), moduleContext )
 checkUpdateLikeFunctions node context =
     let
-        doCheck : Node Signature -> ( List (Rule.Error {}), moduleContext )
+        doCheck : Node Signature -> List (Rule.Error {})
         doCheck signature =
             if True then
-                ( [ Rule.error
-                        { message = "Update.update and Model.Model should be defined in the same module"
-                        , details =
-                            [ "Update.update takes Model.Model as an input and returns it."
-                            ]
-                        }
-                        (Node.range signature)
-                  ]
-                , context
-                )
+                [ Rule.error
+                    { message = "Update.update and Model.Model should be defined in the same module"
+                    , details =
+                        [ "Update.update takes Model.Model as an input and returns it."
+                        ]
+                    }
+                    (Node.range signature)
+                ]
 
             else
-                ( [], context )
+                []
+
+        done errors =
+            ( errors, context )
     in
-    case Node.value node of
-        Declaration.FunctionDeclaration function ->
-            case function.signature of
-                Nothing ->
-                    ( [], context )
+    done <|
+        case Node.value node of
+            Declaration.FunctionDeclaration function ->
+                case function.signature of
+                    Nothing ->
+                        []
 
-                Just signature ->
-                    case Node.value (Node.value signature).typeAnnotation of
-                        TypeAnnotation.FunctionTypeAnnotation arg return ->
-                            doCheck signature
+                    Just signature ->
+                        case Node.value (Node.value signature).typeAnnotation of
+                            TypeAnnotation.FunctionTypeAnnotation arg return ->
+                                doCheck signature
 
-                        _ ->
-                            ( [], context )
+                            _ ->
+                                []
 
-        _ ->
-            ( [], context )
+            _ ->
+                []

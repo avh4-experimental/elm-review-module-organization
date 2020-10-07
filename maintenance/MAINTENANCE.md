@@ -20,9 +20,8 @@ Right after you have created the package, you should
 1. Install the `npm` dependencies
 
 ```bash
-npm install
-# or if you have and prefer Yarn
-yarn
+npm install -g pnpm
+pnpm install
 ```
 
 2. Set up `Git`

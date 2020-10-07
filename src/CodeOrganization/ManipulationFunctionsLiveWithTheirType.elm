@@ -6,10 +6,15 @@ module CodeOrganization.ManipulationFunctionsLiveWithTheirType exposing (rule)
 
 -}
 
+import Elm.Syntax.Declaration as Declaration exposing (Declaration)
+import Elm.Syntax.Node as Node exposing (Node)
 import Review.Rule as Rule exposing (Rule)
 
 
-{-| Reports... REPLACEME
+{-| Reports violations of the following rule:
+
+When a function uses some concrete type both as an input and an output,
+both it and that type should be defined in the same module.
 
     config =
         [ CodeOrganization.ManipulationFunctionsLiveWithTheirType.rule
@@ -18,20 +23,34 @@ import Review.Rule as Rule exposing (Rule)
 
 ## Fail
 
-    a =
-        "REPLACEME example to replace"
+    module Model exposing (Model)
+
+    type alias Model = { ... }
+
+
+    module Update exposing (update)
+    import Model
+
+    update : Msg -> Model -> (Model Cmd Msg)"
+    update _ model = model
 
 
 ## Success
 
-    a =
-        "REPLACEME example to replace"
+    module Main exposing (main)
+
+    type alias Model = { ... }
+
+    update : Msg -> Model -> (Model Cmd Msg)"
+    update _ model = model
 
 
 ## When (not) to enable this rule
 
-This rule is useful when REPLACEME.
-This rule is not useful when REPLACEME.
+This rule is currently experimental.
+It remains to be determined whether this is a good rule to generally enforce, or whether it is too strict.
+
+Please report your experience at <https://github.com/avh4-experimental/elm-review-module-organization/issues>
 
 
 ## Try it out
@@ -42,9 +61,47 @@ You can try this rule out by running the following command:
 elm-review --template avh4-experimental/elm-review-module-organization/example --rules CodeOrganization.ManipulationFunctionsLiveWithTheirType
 ```
 
+
+## Notes
+
+**Manipulation functions live with their type**: any functions that use some concrete type both as an input and an output should be defined in the same module the type itself is defined in (forces Model and update to be together)
+
+    update : x -> Model -> Model
+    update : x -> Model -> ( Model, c )
+    update : x -> ( Model, config ) -> { newModel : Model, effect : e, event : Maybe ev }
+
+    f : Result Model g -> Maybe ( Model, String )
+
 -}
 rule : Rule
 rule =
     Rule.newModuleRuleSchema "CodeOrganization.ManipulationFunctionsLiveWithTheirType" ()
-        -- Add your visitors
+        |> Rule.withDeclarationEnterVisitor checkUpdateLikeFunctions
         |> Rule.fromModuleRuleSchema
+
+
+checkUpdateLikeFunctions :
+    Node Declaration
+    -> moduleContext
+    -> ( List (Rule.Error {}), moduleContext )
+checkUpdateLikeFunctions node context =
+    case Node.value node of
+        Declaration.FunctionDeclaration function ->
+            case function.signature of
+                Nothing ->
+                    ( [], context )
+
+                Just typeAnnotation ->
+                    ( [ Rule.error
+                            { message = "Update.update and Model.Model should be defined in the same module"
+                            , details =
+                                [ "Update.update takes Model.Model as an input and returns it."
+                                ]
+                            }
+                            (Node.range typeAnnotation)
+                      ]
+                    , context
+                    )
+
+        _ ->
+            ( [], context )

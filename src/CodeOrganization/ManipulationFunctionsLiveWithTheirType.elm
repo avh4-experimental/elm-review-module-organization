@@ -10,7 +10,7 @@ import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Expression exposing (Function)
 import Elm.Syntax.Node as Node exposing (Node)
 import Elm.Syntax.Signature exposing (Signature)
-import Elm.Syntax.TypeAnnotation as TypeAnnotation exposing (TypeAnnotation)
+import Elm.Syntax.TypeAnnotation as TypeAnnotation exposing (TypeAnnotation(..))
 import Review.Rule as Rule exposing (Rule)
 
 
@@ -89,9 +89,15 @@ checkUpdateLikeFunctions :
     -> ( List (Rule.Error {}), moduleContext )
 checkUpdateLikeFunctions node context =
     let
-        runRule : ( Node Signature, x ) -> Maybe (Rule.Error {})
-        runRule ( signature, _ ) =
-            if True then
+        runRule :
+            ( Node Signature
+            , { inputType : TypeAnnotation
+              , outputType : TypeAnnotation
+              }
+            )
+            -> Maybe (Rule.Error {})
+        runRule ( signature, { inputType, outputType } ) =
+            if isEqualType inputType outputType then
                 Just <|
                     Rule.error
                         { message = "Update.update and Model.Model should be defined in the same module"
@@ -141,18 +147,60 @@ getTypeAnnotation function =
                 )
 
 
-collectInputAndOutputTypes : TypeAnnotation -> Maybe ()
+collectInputAndOutputTypes :
+    TypeAnnotation
+    ->
+        Maybe
+            { inputType : TypeAnnotation
+            , outputType : TypeAnnotation
+            }
 collectInputAndOutputTypes typeAnnotation =
     case typeAnnotation of
         TypeAnnotation.FunctionTypeAnnotation arg return ->
             Just
-                ()
+                { inputType = Node.value arg
+                , outputType = Node.value return
+                }
 
         _ ->
             Nothing
 
 
 
+-- Generic Elm AST functions
+
+
+isEqualType : TypeAnnotation -> TypeAnnotation -> Bool
+isEqualType a b =
+    case ( a, b ) of
+        ( GenericType a1, GenericType b1 ) ->
+            a1 == b1
+
+        --(Typed ()
+        ( Unit, Unit ) ->
+            True
+
+        ( Tupled a1, Tupled b1 ) ->
+            (List.length a1 == List.length b1)
+                && (List.map2 Tuple.pair a1 b1
+                        |> List.all
+                            (\( at, bt ) ->
+                                isEqualType
+                                    (Node.value at)
+                                    (Node.value bt)
+                            )
+                   )
+       ()
+
+
+
+--= GenericType String
+--  | Typed (Node ( ModuleName, String )) (List (Node TypeAnnotation))
+--  | Unit
+--  | Tupled (List (Node TypeAnnotation))
+--  | Record RecordDefinition
+--  | GenericRecord (Node String) (Node RecordDefinition)
+--  | FunctionTypeAnnotation (Node TypeAnnotation) (Node TypeAnnotation)
 -- Generic Maybe functions
 
 

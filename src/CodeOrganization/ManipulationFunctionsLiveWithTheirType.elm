@@ -8,6 +8,7 @@ module CodeOrganization.ManipulationFunctionsLiveWithTheirType exposing (rule)
 
 import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Node as Node exposing (Node)
+import Elm.Syntax.Signature exposing (Signature)
 import Elm.Syntax.TypeAnnotation as TypeAnnotation
 import Review.Rule as Rule exposing (Rule)
 
@@ -86,6 +87,24 @@ checkUpdateLikeFunctions :
     -> moduleContext
     -> ( List (Rule.Error {}), moduleContext )
 checkUpdateLikeFunctions node context =
+    let
+        doCheck : Node Signature -> ( List (Rule.Error {}), moduleContext )
+        doCheck signature =
+            if True then
+                ( [ Rule.error
+                        { message = "Update.update and Model.Model should be defined in the same module"
+                        , details =
+                            [ "Update.update takes Model.Model as an input and returns it."
+                            ]
+                        }
+                        (Node.range signature)
+                  ]
+                , context
+                )
+
+            else
+                ( [], context )
+    in
     case Node.value node of
         Declaration.FunctionDeclaration function ->
             case function.signature of
@@ -95,16 +114,7 @@ checkUpdateLikeFunctions node context =
                 Just signature ->
                     case Node.value (Node.value signature).typeAnnotation of
                         TypeAnnotation.FunctionTypeAnnotation arg return ->
-                            ( [ Rule.error
-                                    { message = "Update.update and Model.Model should be defined in the same module"
-                                    , details =
-                                        [ "Update.update takes Model.Model as an input and returns it."
-                                        ]
-                                    }
-                                    (Node.range signature)
-                              ]
-                            , context
-                            )
+                            doCheck signature
 
                         _ ->
                             ( [], context )
